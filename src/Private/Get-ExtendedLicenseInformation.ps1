@@ -1,51 +1,39 @@
-function Get-ExtendedLicenseInformation
-{
+function Get-ExtendedLicenseInformation {
     [OutputType([PSCustomObject])]
     [CmdletBinding()]
     param (
-        [Microsoft.Management.Infrastructure.CimSession]$CimSession
+        [parameter()]
+        [Microsoft.Management.Infrastructure.CimSession[]]$CimSession
     )
 
-    $query = 'SELECT Name,Description,ID,ApplicationID,ProductKeyID,ProductKeyChannel,OfflineInstallationId,UseLicenseURL,ValidationURL,PartialProductKey,LicenseStatus,RemainingAppReArmCount,RemainingSkuReArmCount,TrustedTime
-    FROM SoftwareLicensingProduct
-    WHERE LicenseStatus <> 0 AND Name LIKE "Windows%"'
-
-    $product = Get-CimInstance -CimSession $CimSession -Query $query
-
-    $name = $product.Name
-    $desc = $product.Description
-    $activationID = $product.ID
-    $applicationID = $product.ApplicationID
-    $pkID = $product.ProductKeyID
-    $pkChannel = $product.ProductKeyChannel
-    $installationID = $product.OfflineInstallationId
-    $licenseUrl = $product.UseLicenseURL
-    $validationUrl = $product.ValidationURL
-    $partial = $product.PartialProductKey
-    $status = [LicenseStatusCode]( $product.LicenseStatus)
-    $remainingAppRearm = $product.RemainingAppReArmCount
-    $remainingSkuRearm = $product.RemainingSkuReArmCount
-    $trustedTime = [datetime]::MinValue
-    if ([string]::IsNullOrEmpty($product.TrustedTime) -eq $false)
-    {
-        $trustedTime = [System.Management.ManagementDateTimeConverter]::ToDateTime($product.Trustedtime)
+    $cimParam = @{ 
+        ClassName = 'SoftwareLicensingProduct' 
+        Filter = 'LicenseStatus <> 0 AND Name LIKE "Windows%"'
+        #you could include specific properties, but it seems to pull them all in by default
+        #Property = 
     }
 
-    $result = [PSCustomObject]@{
-        Name                            = $name
-        Description                     = $desc
-        'Activation ID'                 = $activationID
-        'Application ID'                = $applicationID
-        'Extended PID'                  = $pkID
-        'Product Key Channel'           = $pkChannel
-        'Installation ID'               = $installationID
-        'Use License URL'               = $licenseUrl
-        'Validation URL'                = $validationUrl
-        'Partial Product Key'           = $partial
-        'License Status'                = $status
-        'Remaining Windows Rearm Count' = $remainingAppRearm
-        'Remaining SKU Rearm Count'     = $remainingSkuRearm
-        'Trusted Time'                  = $trustedTime
+    #runs locally if no cim session specified
+    if ($CimSession) {
+        $cimParam['cimsession'] = $CimSession
     }
-    return $result
+
+    $product = Get-CimInstance @cimParam
+
+    [PSCustomObject]@{
+        Name                            = $product.Name
+        Description                     = $product.Description
+        'Activation ID'                 = $product.ID
+        'Application ID'                = $product.ApplicationID
+        'Extended PID'                  = $product.ProductKeyID
+        'Product Key Channel'           = $product.ProductKeyChannel
+        'Installation ID'               = $product.OfflineInstallationId
+        'Use License URL'               = $product.UseLicenseURL
+        'Validation URL'                = $product.ValidationURL
+        'Partial Product Key'           = $product.PartialProductKey
+        'License Status'                = [LicenseStatusCode]( $product.LicenseStatus)
+        'Remaining Windows Rearm Count' = $product.RemainingAppReArmCount
+        'Remaining SKU Rearm Count'     = $product.RemainingSkuReArmCount
+        'Trusted Time'                  = [datetime]::MinValue, $product.TrustedTime | Sort-Object | Select-Object -Last 1            
+    }
 }
